@@ -28,7 +28,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
+    "@anthropic-ai/sdk": "^0.78.0",
     "@clack/prompts": "^0.9.1",
     "boxen": "^8.0.1",
     "chalk": "^5.4.1",

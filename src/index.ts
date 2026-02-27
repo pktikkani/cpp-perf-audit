@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import * as clack from '@clack/prompts';
 import chalk from 'chalk';
@@ -136,7 +136,7 @@ export async function run(targetPath: string, options: CliOptions): Promise<void
 
     case 'html': {
       const html = await generateHtmlReport(report);
-      const outputPath = options.output ?? 'perf-report.html';
+      const outputPath = options.output ?? join(rootPath, 'perf-report.html');
       await writeFile(outputPath, html, 'utf-8');
       console.log(chalk.dim(`\n  Report saved: ${outputPath}`));
       break;
@@ -158,8 +158,9 @@ export async function run(targetPath: string, options: CliOptions): Promise<void
   if (options.format === 'terminal' && !options.ci) {
     try {
       const html = await generateHtmlReport(report);
-      await writeFile('perf-report.html', html, 'utf-8');
-      console.log(chalk.dim(`  Report saved: ./perf-report.html`));
+      const reportPath = join(rootPath, 'perf-report.html');
+      await writeFile(reportPath, html, 'utf-8');
+      console.log(chalk.dim(`  Report saved: ${reportPath}`));
     } catch {
       // Non-critical — don't fail if template is missing
     }

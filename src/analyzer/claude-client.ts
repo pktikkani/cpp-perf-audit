@@ -22,6 +22,37 @@ function getClient(): Anthropic {
   return client;
 }
 
+function friendlyError(err: unknown): Error {
+  const errObj = err as { status?: number; message?: string; error?: { message?: string } };
+  const msg = errObj.error?.message ?? errObj.message ?? String(err);
+
+  if (errObj.status === 401) {
+    return new Error('Invalid API key. Check your ANTHROPIC_API_KEY environment variable.');
+  }
+  if (errObj.status === 403) {
+    return new Error('Access denied. Your API key may lack permissions for this model.');
+  }
+  if (errObj.status === 404) {
+    return new Error(`Model not found: ${MODEL}. Try updating @anthropic-ai/sdk.`);
+  }
+  if (errObj.status === 400) {
+    return new Error(`Bad request: ${msg}`);
+  }
+  if (errObj.status && errObj.status >= 500) {
+    return new Error(`Anthropic API server error (${errObj.status}). Try again later.`);
+  }
+
+  const strMsg = String(msg).toLowerCase();
+  if (strMsg.includes('econnrefused') || strMsg.includes('enotfound') || strMsg.includes('fetch failed') || strMsg.includes('connection error')) {
+    return new Error('Connection error. Check your internet connection and try again.');
+  }
+  if (strMsg.includes('timeout') || strMsg.includes('etimedout')) {
+    return new Error('Request timed out. Check your internet connection and try again.');
+  }
+
+  return err instanceof Error ? err : new Error(String(err));
+}
+
 export async function analyzeCode(prompt: string): Promise<Finding[]> {
   const anthropic = getClient();
   let lastError: Error | null = null;
@@ -42,7 +73,7 @@ export async function analyzeCode(prompt: string): Promise<Finding[]> {
 
       return parseFindings(textBlock.text);
     } catch (err: unknown) {
-      lastError = err instanceof Error ? err : new Error(String(err));
+      lastError = friendlyError(err);
       const errObj = err as { status?: number };
 
       if (errObj.status === 429 || errObj.status === 529) {
@@ -63,27 +94,45 @@ export async function analyzeCodeStreaming(
   onToken: (token: string) => void,
 ): Promise<Finding[]> {
   const anthropic = getClient();
+  let lastError: Error | null = null;
 
-  const stream = anthropic.messages.stream({
-    model: MODEL,
-    max_tokens: MAX_TOKENS,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: prompt }],
-  });
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const stream = anthropic.messages.stream({
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: prompt }],
+      });
 
-  let fullText = '';
+      let fullText = '';
 
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta') {
-      const delta = event.delta;
-      if ('text' in delta) {
-        fullText += delta.text;
-        onToken(delta.text);
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta') {
+          const delta = event.delta;
+          if ('text' in delta) {
+            fullText += delta.text;
+            onToken(delta.text);
+          }
+        }
       }
+
+      return parseFindings(fullText);
+    } catch (err: unknown) {
+      lastError = friendlyError(err);
+      const errObj = err as { status?: number };
+
+      if (errObj.status === 429 || errObj.status === 529) {
+        const delay = Math.pow(2, attempt + 1) * 1000;
+        await sleep(delay);
+        continue;
+      }
+
+      throw lastError;
     }
   }
 
-  return parseFindings(fullText);
+  throw lastError ?? new Error('Analysis failed after retries');
 }
 
 function parseFindings(text: string): Finding[] {
