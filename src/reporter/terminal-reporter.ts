@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import chalk, { type ChalkInstance } from 'chalk';
 import boxen from 'boxen';
 import Table from 'cli-table3';
 import type { AnalysisReport, Finding, Severity } from '../types/index.js';
@@ -49,7 +49,7 @@ function renderProjectInfo(report: AnalysisReport): void {
 
 function renderHealthScore(score: number): void {
   const bar = progressBar(score, 24);
-  let scoreColor: chalk.ChalkInstance;
+  let scoreColor: ChalkInstance;
   if (score >= 80) scoreColor = colors.good;
   else if (score >= 60) scoreColor = colors.warning;
   else scoreColor = colors.critical;

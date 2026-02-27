@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import chalk, { type ChalkInstance } from 'chalk';
 
 export const colors = {
   critical: chalk.red,
@@ -33,7 +33,7 @@ export const icons = {
   },
 };
 
-export function severityColor(severity: string): chalk.ChalkInstance {
+export function severityColor(severity: string): ChalkInstance {
   switch (severity) {
     case 'critical': return colors.critical;
     case 'warning': return colors.warning;
@@ -56,7 +56,7 @@ export function severityIcon(severity: string): string {
 export function progressBar(score: number, width: number = 20): string {
   const filled = Math.round((score / 100) * width);
   const empty = width - filled;
-  let color: chalk.ChalkInstance;
+  let color: ChalkInstance;
   if (score >= 80) color = colors.good;
   else if (score >= 60) color = colors.warning;
   else color = colors.critical;
